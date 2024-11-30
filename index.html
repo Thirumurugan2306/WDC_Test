@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tableau Web Data Connector</title>
+    <script src="https://connectors.tableau.com/libs/tableauwdc-2.1.1.js"></script>
+    <script>
+        let myConnector = tableau.makeConnector();
+
+        myConnector.init = function(initCallback) {
+            tableau.connectionName = "USGS Earthquake Feed";
+            initCallback();
+        };
+
+        myConnector.getSchema = function(schemaCallback) {
+            var mag_place_cols = [{
+                id: "id",
+                dataType: tableau.dataTypeEnum.string
+            }, {
+                id: "mag",
+                alias: "magnitude",
+                dataType: tableau.dataTypeEnum.float
+            }, {
+                id: "title",
+                alias: "title",
+                dataType: tableau.dataTypeEnum.string
+            }, {
+                id: "lat",
+                alias: "latitude",
+                dataType: tableau.dataTypeEnum.float
+            }, {
+                id: "lon",
+                alias: "longitude",
+                dataType: tableau.dataTypeEnum.float
+            }];
+
+            var magPlaceTable = {
+                id: "magPlace",
+                alias: "Magnitude and Place Data",
+                columns: mag_place_cols
+            };
+
+            var time_url_cols = [{
+                id: "id",
+                dataType: tableau.dataTypeEnum.string
+            }, {
+                id: "time",
+                alias: "time",
+                dataType: tableau.dataTypeEnum.date
+            }, {
+                id: "url",
+                alias: "url",
+                dataType: tableau.dataTypeEnum.string
+            }];
+
+            var timeUrlTable = {
+                id: "timeUrl",
+                alias: "Time and URL Data",
+                columns: time_url_cols
+            };
+
+            schemaCallback([magPlaceTable, timeUrlTable]);
+        };
+
+        myConnector.getData = function(table, doneCallback) {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    if (table.tableInfo.id === "magPlace") {
+                        table.appendRows(data.magPlace);
+                    } else if (table.tableInfo.id === "timeUrl") {
+                        table.appendRows(data.timeUrl);
+                    }
+                    doneCallback();
+                });
+        };
+
+        tableau.registerConnector(myConnector);
+
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById("submitButton").addEventListener("click", function() {
+                var dateObj = {
+                    startDate: document.getElementById('start-date-one').value.trim(),
+                    endDate: document.getElementById('end-date-one').value.trim(),
+                };
+
+                function isValidDate(dateStr) {
+                    var d = new Date(dateStr);
+                    return !isNaN(d.getDate());
+                }
+
+                if (isValidDate(dateObj.startDate) && isValidDate(dateObj.endDate)) {
+                    fetch('/submit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(dateObj)
+                    }).then(() => tableau.submit());
+                } else {
+                    alert("Enter valid dates. For example, 2016-05-08.");
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>My Tableau Web Data Connector</h1>
+    <form id="form">
+        <label for="start-date-one">Start Date</label>
+        <input type="text" id="start-date-one" value="2016-05-08">
+        <label for="end-date-one">End Date</label>
+        <input type="text" id="end-date-one" value="2016-05-15">
+        <button type="button" id="submitButton">Get Earthquake Data!</button>
+    </form>
+</body>
+</html>
